@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">Recognizeer</string>
+
+    <string name="btn_ok">Ok</string>
+    <string name="txt_no_camera_permission">No camera permission</string>
+    <string name="btn_start">Start</string>
+    <string name="hint_enter_text">Enter text here</string>
+    <string name="btn_create_pdf">Create PDF</string>
+    <string name="btn_take_screenshot">Take screenshot</string>
+
+    <string name="picture">Picture</string>
+    <string name="description_info">Info</string>
+    <string name="request_permission">This sample needs camera permission.</string>
+    <string name="camera_error">This device doesn\'t support Camera2 API.</string>
+
+    <string name="intro_message">
+        <![CDATA[
+
+
+            This sample demonstrates the basic use of Camera2 API. Check the source code to see how
+            you can display camera preview and take pictures.
+
+
+        ]]>
+    </string>
+</resources>
