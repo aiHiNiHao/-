@@ -33,12 +33,15 @@ public class OcrDetectorProcessor implements Detector.Processor<TextBlock> {
             ocrGraphicOverlay.add(graphic);
         }
 
-        tvOcrResult.post(new Runnable() {
-            @Override
-            public void run() {
-                tvOcrResult.setText(sb.toString());
-            }
-        });
+        if (tvOcrResult!= null){
+
+            tvOcrResult.post(new Runnable() {
+                @Override
+                public void run() {
+                    tvOcrResult.setText(sb.toString());
+                }
+            });
+        }
     }
 
     @Override

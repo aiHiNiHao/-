@@ -124,8 +124,7 @@ public class OCRActivity extends AppCompatActivity {
         textRecognizer.setProcessor(new OcrDetectorProcessor(mGraphicOverlay, tvOcrResult));
 
         if (textRecognizer.isOperational()) {
-            mCameraSource =
-                    new CameraSource.Builder(getApplicationContext(), textRecognizer)
+            mCameraSource = new CameraSource.Builder(getApplicationContext(), textRecognizer)
                             .setFacing(CameraSource.CAMERA_FACING_BACK)
                             .setRequestedPreviewSize(1280, 1024)
                             .setRequestedFps(2.0f)
