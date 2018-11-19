@@ -21,7 +21,8 @@
         android:text="asldjkflsjkdlfj"
         android:gravity="center"
         android:textSize="40sp"
-        android:background="#fff"/>
+        android:background="#fff"
+        android:visibility="gone"/>
 
     <com.example.apple.recognizeer.ocr.GraphicOverlay
         android:id="@+id/graphicOverlay"

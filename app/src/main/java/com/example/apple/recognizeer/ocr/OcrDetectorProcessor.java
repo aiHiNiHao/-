@@ -22,6 +22,7 @@ public class OcrDetectorProcessor implements Detector.Processor<TextBlock> {
     public void receiveDetections(Detector.Detections<TextBlock> detections) {
         ocrGraphicOverlay.clear();
         SparseArray<TextBlock> items = detections.getDetectedItems();
+        Log.i("lijing", "size == "+items.size());
         final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < items.size(); ++i) {
             TextBlock item = items.valueAt(i);
