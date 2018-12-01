@@ -50,6 +50,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -142,31 +143,79 @@ public class MainActivity extends AppCompatActivity {
 //                clone.flip();
 //                mFrameProcessor.setNextFrame(clone);
 
-//                int offset = 0;
-//                int pixelStride = planes[0].getPixelStride();
-//                int rowStride = planes[0].getRowStride();
-//                int rowPadding = rowStride - pixelStride * width;
-//                Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
-//                bitmap.copyPixelsFromBuffer(buffer);
-//
-//                ivShow.setImageBitmap(bitmap);
+                int offset = 0;
+                buffer.position(0);
+                int pixelStride = planes[0].getPixelStride();
+                int rowStride = planes[0].getRowStride();
+                int rowPadding = rowStride - pixelStride * width;
+                Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
+                bitmap.copyPixelsFromBuffer(buffer);
 
-                byte[] yuvBytes = new byte[width * height * 3 / 2];
-                Bitmap bitmap1 = RGBtoNV21(image, yuvBytes, width, height);
+                byte[] yuv = rgb2YCbCr420(rgbaBytes, width, height);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(yuv);
 
-                ivShow.setImageBitmap(bitmap1);
 
-                ByteBuffer clone = ByteBuffer.allocate(yuvBytes.length);
-                clone.get(yuvBytes);
-                clone.rewind();
-                mFrameProcessor.setNextFrame(clone);
+                YuvImage yuvImage = new YuvImage(yuv, ImageFormat.NV21, width, height, null);
+                if(yuvImage!=null) {
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    yuvImage.compressToJpeg(new Rect(0, 0, width, height), 80, stream);
+
+                    Bitmap bmp = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
+                    //TODO：此处可以对位图进行处理，如显示，保存等
+                    ivShow.setImageBitmap(bmp);
+                    try {
+                        stream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                mFrameProcessor.setNextFrame(byteBuffer);
+
+
                 image.close();
 
+                imageReader.setOnImageAvailableListener(null,null);
             }
 
         }, null);
     }
 
+    /** RGB图片转YUV420数据
+     * 宽、高不能为奇数
+     * @param pixels 图片像素集合
+     * @param width 宽
+     * @param height 高
+     * @return */
+    public byte[] rgb2YCbCr420(byte[] pixels, int width, int height) {
+        int len = width * height;
+        //yuv格式数组大小，y亮度占len长度，u,v各占len/4长度。
+        byte[] yuv = new byte[len * 3 / 2];
+        int y, u, v;
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                //屏蔽ARGB的透明度值
+                int rgb = pixels[i * width + j] & 0x00FFFFFF;
+                //像素的颜色顺序为bgr，移位运算。
+                int r = rgb & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int b = (rgb >> 16) & 0xFF;
+                //套用公式
+                y = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
+                u = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
+                v = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
+                //调整
+                y = y < 16 ? 16 : (y > 255 ? 255 : y);
+                u = u < 0 ? 0 : (u > 255 ? 255 : u);
+                v = v < 0 ? 0 : (v > 255 ? 255 : v);
+                //赋值
+                yuv[i * width + j] = (byte) y;
+                yuv[len + (i >> 1) * width + (j & ~1) + 0] = (byte) u;
+                yuv[len + +(i >> 1) * width + (j & ~1) + 1] = (byte) v;
+            }
+        }
+        return yuv;
+    }
     Bitmap RGBtoNV21(Image image, byte[] yuv420sp, int width, int height) {
         try {
             final int frameSize = width * height;
@@ -203,9 +252,9 @@ public class MainActivity extends AppCompatActivity {
 
                     // RGB to YUV conversion according to
                     // https://en.wikipedia.org/wiki/YUV#Y.E2.80.B2UV444_to_RGB888_conversion
-                        Y = ((66 * R + 129 * G + 25 * B + 128) >> 8) + 16;
-                        U = ((-38 * R - 74 * G + 112 * B + 128) >> 8) + 128;
-                        V = ((112 * R - 94 * G - 18 * B + 128) >> 8) + 128;
+                    Y = ((66 * R + 129 * G + 25 * B + 128) >> 8) + 16;
+                    U = ((-38 * R - 74 * G + 112 * B + 128) >> 8) + 128;
+                    V = ((112 * R - 94 * G - 18 * B + 128) >> 8) + 128;
 
 //                    Y = (int) Math.round(R * .299000 + G * .587000 + B * .114000);
 //                    U = (int) Math.round(R * -.168736 + G * -.331264 + B * .500000 + 128);
@@ -387,6 +436,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class FrameProcessingRunnable implements Runnable {
+        private boolean isFirst = true;
         private Detector<?> mDetector;
         private long mStartTimeMillis = SystemClock.elapsedRealtime();
 
@@ -472,9 +522,10 @@ public class MainActivity extends AppCompatActivity {
             Frame outputFrame;
             ByteBuffer data;
 
-            while (true) {
+            while (isFirst) {
                 Log.i("lijing", "run");
                 synchronized (mLock) {
+                    isFirst = false;
                     while (mActive && (mPendingFrameData == null)) {
                         try {
                             // Wait for the next frame to be received from the camera, since we
