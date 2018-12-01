@@ -82,12 +82,12 @@ public class MainActivity extends AppCompatActivity {
 
         graphicOverlay = (GraphicOverlay) findViewById(R.id.graphicOverlay);
 
-//        webView.loadUrl("https://www.baidu.com/s?word=%E5%BD%95%E5%B1%8F&ts=8072133&t_kt=0&ie=utf-8&fm_kl=021394be2f&rsv_iqid=3259783768&rsv_t=b39atb4WgjYrHvo4SnKzw%252B2gDJ6qtxWMoQ%252FfSnsrWJcjtTlXAlR0HaqYzQ&sa=ib&ms=1&rsv_pq=3259783768&rsv_sug4=10587&tj=1&inputT=2660&ss=100&from=844b&isid=44006&mod=0&async=1");
-//        WebSettings settings = webView.getSettings();
-//        settings.setJavaScriptEnabled(true);
-//        settings.setUseWideViewPort(true);
-//        settings.setLoadWithOverviewMode(true);
-//        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        webView.loadUrl("https://www.baidu.com/s?wd=TextRecognizer%20%E4%B8%AD%E6%96%87&rsv_spt=1&rsv_iqid=0xcad453060000582a&issp=1&f=8&rsv_bp=1&rsv_idx=2&ie=utf-8&rqlang=cn&tn=baiduhome_pg&rsv_enter=1&oq=google%25E8%25AF%2586%25E5%2588%25AB%25E6%2596%2587%25E5%25AD%2597&rsv_t=f288PqT5fP0IA6PlXMQ5W0NrrA1jilAzBpnIvnZLOGfSBeVGepXoCLysXOUaOhLLSePI&inputT=7629&rsv_pq=a45fe8450000cc93&rsv_sug3=86&rsv_sug1=55&rsv_sug7=000&rsv_sug2=0&rsv_sug4=7629&rsv_sug=1");
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         textRecognizer = new TextRecognizer.Builder(this).build();
         textRecognizer.setProcessor(new OcrDetectorProcessor(graphicOverlay, null));
@@ -126,52 +126,26 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onImageAvailable(ImageReader reader) {
                 if (!isResume) return;
+                Image image = imageReader.acquireLatestImage();
+                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
 
-                Image image = imageReader.acquireNextImage();
-
-                final Image.Plane[] planes = image.getPlanes();
-                final ByteBuffer buffer = planes[0].getBuffer();
-                byte[] rgbaBytes = new byte[width * height * 4];
-                buffer.get(rgbaBytes);
-
-
-//                复制ByteBuffer
-//                ByteBuffer clone = ByteBuffer.allocate(buffer.capacity());
-//                buffer.rewind();//copy from the beginning
-//                clone.put(buffer);
-//                buffer.rewind();
-//                clone.flip();
-//                mFrameProcessor.setNextFrame(clone);
-
-                int offset = 0;
-                buffer.position(0);
-                int pixelStride = planes[0].getPixelStride();
-                int rowStride = planes[0].getRowStride();
+                int pixelStride = image.getPlanes()[0].getPixelStride();
+                int rowStride = image.getPlanes()[0].getRowStride();
                 int rowPadding = rowStride - pixelStride * width;
+
                 Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
                 bitmap.copyPixelsFromBuffer(buffer);
 
-                byte[] yuv = rgb2YCbCr420(rgbaBytes, width, height);
-                ByteBuffer byteBuffer = ByteBuffer.wrap(yuv);
+                Frame frame = new Frame.Builder()
+                        .setBitmap(bitmap)
+                        .build();
 
 
-                YuvImage yuvImage = new YuvImage(yuv, ImageFormat.NV21, width, height, null);
-                if(yuvImage!=null) {
-                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                    yuvImage.compressToJpeg(new Rect(0, 0, width, height), 80, stream);
-
-                    Bitmap bmp = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
-                    //TODO：此处可以对位图进行处理，如显示，保存等
-                    ivShow.setImageBitmap(bmp);
-                    try {
-                        stream.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                SparseArray<TextBlock> items = textRecognizer.detect(frame);
+                for (int i = 0; i < items.size(); ++i) {
+                    TextBlock item = items.valueAt(i);
+                    Log.d("lijing", "value == " + item.getValue());
                 }
-
-                mFrameProcessor.setNextFrame(byteBuffer);
-
 
                 image.close();
 
