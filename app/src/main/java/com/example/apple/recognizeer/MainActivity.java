@@ -1,29 +1,22 @@
 package com.example.apple.recognizeer;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
+import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
-import android.graphics.YuvImage;
-import android.hardware.Camera;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
-import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.os.SystemClock;
-import android.renderscript.Allocation;
-import android.renderscript.Element;
-import android.renderscript.RenderScript;
-import android.renderscript.ScriptIntrinsicYuvToRGB;
-import android.renderscript.Type;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -31,66 +24,90 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.Display;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.ImageView;
-import android.widget.TextView;
 
-import com.example.apple.recognizeer.ocr.CameraSource;
-import com.example.apple.recognizeer.ocr.GraphicOverlay;
-import com.example.apple.recognizeer.ocr.OcrDetectorProcessor;
-import com.example.apple.recognizeer.ocr.ScreenRecordService;
-import com.example.apple.recognizeer.ocr.ScreenRecordServiceNew;
-import com.google.android.gms.vision.Detector;
 import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.text.TextBlock;
 import com.google.android.gms.vision.text.TextRecognizer;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.HashMap;
-import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
-    private final String TAG = "MainActivity";
+
+    public static final String YAN = "kdsfgjkgdsklgkdlg";
+    public static final String KW = "电影网站";
+    public static final String GOAL = "https://m.xigua110.com";
+
     private WebView webView;
     private ImageView ivShow;
-    private GraphicOverlay graphicOverlay;
 
     private MediaProjectionManager mMediaProjectionManager;
     private TextRecognizer textRecognizer;
     private VirtualDisplay mVirtualDisplay;
     private ImageReader imageReader;
+    private WebJumpController webJumpController;
 
-    private Thread mProcessingThread;
-    private FrameProcessingRunnable mFrameProcessor;
-//    private Map<byte[], ByteBuffer> mBytesToByteBuffer = new HashMap<>();
 
     private boolean isResume;
+    private boolean isLoading;
     private int width;
     private int height;
+    private boolean isNeedRecongnizeer = true;//第一次识别
+
+    private final int MSG_FIRST_GET_INPUT_BOUND = 1;
+    private final int MSG_SECOND_GET_INPUT_BOUND = 2;
+    private final int MSG_SS = 3;//短暂性的
+    private final int MSG_SS_FINISHED = 4;
+    private final int MSG_FINDING_SCROLL = 5;
+    private final int MSG_FINDED = 6;
+
+    private int currState = MSG_FIRST_GET_INPUT_BOUND;
+
+    private Handler handler;
+
+    private Rect finalInputRect;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        initHandler();
+
         webView = findViewById(R.id.webview);
         ivShow = findViewById(R.id.iv_show);
 
-        graphicOverlay = (GraphicOverlay) findViewById(R.id.graphicOverlay);
+        webJumpController = new WebJumpController(this, webView, new WebJumpController.WebJumpListener() {
+            @Override
+            public void onFindedTargetPage() {
+                restartRecongnizer(MSG_FINDING_SCROLL);
+            }
 
-        webView.loadUrl("https://www.baidu.com/s?wd=TextRecognizer%20%E4%B8%AD%E6%96%87&rsv_spt=1&rsv_iqid=0xcad453060000582a&issp=1&f=8&rsv_bp=1&rsv_idx=2&ie=utf-8&rqlang=cn&tn=baiduhome_pg&rsv_enter=1&oq=google%25E8%25AF%2586%25E5%2588%25AB%25E6%2596%2587%25E5%25AD%2597&rsv_t=f288PqT5fP0IA6PlXMQ5W0NrrA1jilAzBpnIvnZLOGfSBeVGepXoCLysXOUaOhLLSePI&inputT=7629&rsv_pq=a45fe8450000cc93&rsv_sug3=86&rsv_sug1=55&rsv_sug7=000&rsv_sug2=0&rsv_sug4=7629&rsv_sug=1");
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setUseWideViewPort(true);
-        settings.setLoadWithOverviewMode(true);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            @Override
+            public void onWebViewPageRefreshFinished(String url) {
+                if (currState == MSG_FIRST_GET_INPUT_BOUND) {
+                    restartRecongnizer(MSG_FIRST_GET_INPUT_BOUND);
+                } else if (currState == MSG_SS) {
+                    currState = MSG_SS_FINISHED;
+                    Message msg = Message.obtain();
+                    msg.what = MSG_SS_FINISHED;
+                    Bundle bundle = new Bundle();
+                    bundle.putString("url", url);
+                    msg.setData(bundle);
+                    handler.sendMessage(msg);
+                } else if (currState == MSG_FINDED) {
+                    handler.sendEmptyMessageDelayed(MSG_FINDED,2000);
+                }
+            }
+        });
+
 
         textRecognizer = new TextRecognizer.Builder(this).build();
-        textRecognizer.setProcessor(new OcrDetectorProcessor(graphicOverlay, null));
 
         mMediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         Intent screenCaptureIntent = mMediaProjectionManager.createScreenCaptureIntent();
@@ -101,12 +118,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
-        mFrameProcessor = new FrameProcessingRunnable(textRecognizer);
-        mProcessingThread = new Thread(mFrameProcessor);
-        mFrameProcessor.setActive(true);
-        mProcessingThread.start();
-
 
         Display defaultDisplay = getWindowManager().getDefaultDisplay();
         DisplayMetrics metrics = new DisplayMetrics();
@@ -122,243 +133,90 @@ public class MainActivity extends AppCompatActivity {
                 height, densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 imageReader.getSurface(), null, null);
+
+
         imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {
-                if (!isResume) return;
+                Log.i("lijing", "onImageAvailable: -----------");
+
                 Image image = imageReader.acquireLatestImage();
-                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-
-                int pixelStride = image.getPlanes()[0].getPixelStride();
-                int rowStride = image.getPlanes()[0].getRowStride();
-                int rowPadding = rowStride - pixelStride * width;
-
-                Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
-                bitmap.copyPixelsFromBuffer(buffer);
-
-                Frame frame = new Frame.Builder()
-                        .setBitmap(bitmap)
-                        .build();
 
 
-                SparseArray<TextBlock> items = textRecognizer.detect(frame);
-                for (int i = 0; i < items.size(); ++i) {
-                    TextBlock item = items.valueAt(i);
-                    Log.d("lijing", "value == " + item.getValue());
-                }
+                if (isResume && isNeedRecongnizeer) {
 
-                image.close();
+                    ByteBuffer buffer = image.getPlanes()[0].getBuffer();
 
-                imageReader.setOnImageAvailableListener(null,null);
-            }
+                    int pixelStride = image.getPlanes()[0].getPixelStride();
+                    int rowStride = image.getPlanes()[0].getRowStride();
+                    int rowPadding = rowStride - pixelStride * width;
 
-        }, null);
-    }
+                    Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
+                    bitmap.copyPixelsFromBuffer(buffer);
 
-    /** RGB图片转YUV420数据
-     * 宽、高不能为奇数
-     * @param pixels 图片像素集合
-     * @param width 宽
-     * @param height 高
-     * @return */
-    public byte[] rgb2YCbCr420(byte[] pixels, int width, int height) {
-        int len = width * height;
-        //yuv格式数组大小，y亮度占len长度，u,v各占len/4长度。
-        byte[] yuv = new byte[len * 3 / 2];
-        int y, u, v;
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                //屏蔽ARGB的透明度值
-                int rgb = pixels[i * width + j] & 0x00FFFFFF;
-                //像素的颜色顺序为bgr，移位运算。
-                int r = rgb & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = (rgb >> 16) & 0xFF;
-                //套用公式
-                y = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
-                u = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
-                v = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
-                //调整
-                y = y < 16 ? 16 : (y > 255 ? 255 : y);
-                u = u < 0 ? 0 : (u > 255 ? 255 : u);
-                v = v < 0 ? 0 : (v > 255 ? 255 : v);
-                //赋值
-                yuv[i * width + j] = (byte) y;
-                yuv[len + (i >> 1) * width + (j & ~1) + 0] = (byte) u;
-                yuv[len + +(i >> 1) * width + (j & ~1) + 1] = (byte) v;
-            }
-        }
-        return yuv;
-    }
-    Bitmap RGBtoNV21(Image image, byte[] yuv420sp, int width, int height) {
-        try {
-            final int frameSize = width * height;
+                    Frame frame = new Frame.Builder()
+                            .setBitmap(bitmap)
+                            .build();
 
-            int yIndex = 0;
-            int uvIndex = frameSize;
-            int pixelStride = image.getPlanes()[0].getPixelStride();
-            int rowStride = image.getPlanes()[0].getRowStride();
-            int rowPadding = rowStride - pixelStride * width;
-            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                    Rect goalRect = null;
+                    SparseArray<TextBlock> items = textRecognizer.detect(frame);
+                    for (int i = 0; i < items.size(); ++i) {
+                        TextBlock item = items.valueAt(i);
+                        String value = item.getValue();
+                        if (currState == MSG_SECOND_GET_INPUT_BOUND || currState == MSG_FIRST_GET_INPUT_BOUND) {
 
-            Bitmap bitmap = Bitmap.createBitmap(getResources().getDisplayMetrics(), width, height, Bitmap.Config.ARGB_8888);
+                            if (YAN.equals(value) || value.contains(YAN)) {
+                                Rect boundingBox = item.getBoundingBox();
+                                Log.i("lijing", boundingBox.toString());
 
-            int A, R, G, B, Y, U, V;
-            int offset = 0;
+                                if (currState == MSG_FIRST_GET_INPUT_BOUND) {
+                                    Message msg = Message.obtain();
+                                    msg.what = MSG_FIRST_GET_INPUT_BOUND;
+                                    Bundle bundle = new Bundle();
+                                    bundle.putParcelable("rect", boundingBox);
+                                    msg.setData(bundle);
+                                    handler.sendMessage(msg);
+                                } else if (currState == MSG_SECOND_GET_INPUT_BOUND) {
+                                    finalInputRect = boundingBox;
+                                    handler.sendEmptyMessage(MSG_SECOND_GET_INPUT_BOUND);
+                                }
 
-            for (int i = 0; i < height; i++) {
-                for (int j = 0; j < width; j++) {
-
-                    // Useful link: http://stackoverflow.com/questions/26673127/android-imagereader-acquirelatestimage-returns-invalid-jpg
-
-                    R = (buffer.get(offset) & 0xff) << 16;     // R
-                    G = (buffer.get(offset + 1) & 0xff) << 8;  // G
-                    B = (buffer.get(offset + 2) & 0xff);       // B
-                    A = (buffer.get(offset + 3) & 0xff) << 24; // A
-                    offset += pixelStride;
-
-                    int pixel = 0;
-                    pixel |= R;     // R
-                    pixel |= G;  // G
-                    pixel |= B;       // B
-                    pixel |= A; // A
-                    bitmap.setPixel(j, i, pixel);
-
-                    // RGB to YUV conversion according to
-                    // https://en.wikipedia.org/wiki/YUV#Y.E2.80.B2UV444_to_RGB888_conversion
-                    Y = ((66 * R + 129 * G + 25 * B + 128) >> 8) + 16;
-                    U = ((-38 * R - 74 * G + 112 * B + 128) >> 8) + 128;
-                    V = ((112 * R - 94 * G - 18 * B + 128) >> 8) + 128;
-
-//                    Y = (int) Math.round(R * .299000 + G * .587000 + B * .114000);
-//                    U = (int) Math.round(R * -.168736 + G * -.331264 + B * .500000 + 128);
-//                    V = (int) Math.round(R * .500000 + G * -.418688 + B * -.081312 + 128);
-
-                    // NV21 has a plane of Y and interleaved planes of VU each sampled by a factor
-                    // of 2 meaning for every 4 Y pixels there are 1 V and 1 U.
-                    // Note the sampling is every other pixel AND every other scanline.
-                    yuv420sp[yIndex++] = (byte) ((Y < 0) ? 0 : ((Y > 255) ? 255 : Y));
-                    if (i % 2 == 0 && j % 2 == 0) {
-                        yuv420sp[uvIndex++] = (byte) ((V < 0) ? 0 : ((V > 255) ? 255 : V));
-                        yuv420sp[uvIndex++] = (byte) ((U < 0) ? 0 : ((U > 255) ? 255 : U));
+                                break;
+                            }
+                        } else if (currState == MSG_FINDING_SCROLL) {
+                            if (GOAL.equals(value) || value.contains(GOAL)) {
+                                goalRect = item.getBoundingBox();
+                                break;
+                            }
+                        }
                     }
+
+                    if (currState == MSG_FINDING_SCROLL) {
+                        Message msg = Message.obtain();
+                        msg.what = MSG_FINDING_SCROLL;
+                        Bundle bundle = new Bundle();
+                        bundle.putParcelable("rect", goalRect);
+                        msg.setData(bundle);
+                        handler.sendMessage(msg);
+                    }
+
+
+                    isNeedRecongnizeer = false;
+
                 }
-                offset += rowPadding;
-            }
-
-
-            return bitmap;
-
-        } catch (Exception e) {
-            return null;
-        }
-
-    }
-
-    public Bitmap nv21ToBitmap(byte[] nv21, int width, int height) {
-
-        RenderScript rs;
-        ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
-        Type.Builder yuvType, rgbaType;
-        Allocation in, out;
-
-        rs = RenderScript.create(this);
-        yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
-
-        yuvType = new Type.Builder(rs, Element.U8(rs)).setX(nv21.length);
-        in = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
-
-        rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
-        out = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
-
-        in.copyFrom(nv21);
-
-        yuvToRgbIntrinsic.setInput(in);
-        yuvToRgbIntrinsic.forEach(out);
-
-        Bitmap bmpout = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        out.copyTo(bmpout);
-
-        return bmpout;
-
-    }
-
-    @TargetApi(19)
-    public byte[] yuvImageToByteArray(Image image) {
-
-        assert (image.getFormat() == ImageFormat.YUV_420_888);
-
-        int width = image.getWidth();
-        int height = image.getHeight();
-
-        Image.Plane[] planes = image.getPlanes();
-        byte[] result = new byte[width * height * 3 / 2];
-
-        int stride = planes[0].getRowStride();
-        if (stride == width) {
-            planes[0].getBuffer().get(result, 0, width);
-        } else {
-            for (int row = 0; row < height; row++) {
-                planes[0].getBuffer().position(row * stride);
-                planes[0].getBuffer().get(result, row * width, width);
-            }
-        }
-
-        stride = planes[1].getRowStride();
-        assert (stride == planes[2].getRowStride());
-        byte[] rowBytesCb = new byte[stride];
-        byte[] rowBytesCr = new byte[stride];
-
-        for (int row = 0; row < height / 2; row++) {
-            int rowOffset = width * height + width / 2 * row;
-            planes[1].getBuffer().position(row * stride);
-            planes[1].getBuffer().get(rowBytesCb, 0, width / 2);
-            planes[2].getBuffer().position(row * stride);
-            planes[2].getBuffer().get(rowBytesCr, 0, width / 2);
-
-            for (int col = 0; col < width / 2; col++) {
-                result[rowOffset + col * 2] = rowBytesCr[col];
-                result[rowOffset + col * 2 + 1] = rowBytesCb[col];
-            }
-        }
-        return result;
-    }
-
-    void RGBtoNV21(byte[] yuv420sp, byte[] argb, int width, int height) {
-        final int frameSize = width * height;
-
-        int yIndex = 0;
-        int uvIndex = frameSize;
-
-        int A, R, G, B, Y, U, V;
-        int index = 0;
-        int rgbIndex = 0;
-
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-
-                R = argb[rgbIndex++];
-                G = argb[rgbIndex++];
-                B = argb[rgbIndex++];
-                A = argb[rgbIndex++]; // Ignored right now.
-
-                // RGB to YUV conversion according to
-                // https://en.wikipedia.org/wiki/YUV#Y.E2.80.B2UV444_to_RGB888_conversion
-                Y = ((66 * R + 129 * G + 25 * B + 128) >> 8) + 16;
-                U = ((-38 * R - 74 * G + 112 * B + 128) >> 8) + 128;
-                V = ((112 * R - 94 * G - 18 * B + 128) >> 8) + 128;
-
-                // NV21 has a plane of Y and interleaved planes of VU each sampled by a factor
-                // of 2 meaning for every 4 Y pixels there are 1 V and 1 U.
-                // Note the sampling is every other pixel AND every other scanline.
-                yuv420sp[yIndex++] = (byte) ((Y < 0) ? 0 : ((Y > 255) ? 255 : Y));
-                if (i % 2 == 0 && index % 2 == 0) {
-                    yuv420sp[uvIndex++] = (byte) ((V < 0) ? 0 : ((V > 255) ? 255 : V));
-                    yuv420sp[uvIndex++] = (byte) ((U < 0) ? 0 : ((U > 255) ? 255 : U));
+                if (image != null) {
+                    image.close();
                 }
-                index++;
+
             }
-        }
+        }, null);
+
+        restartRecongnizer(MSG_FIRST_GET_INPUT_BOUND);
+    }
+
+    private void restartRecongnizer(int state) {
+        currState = state;
+        isNeedRecongnizeer = true;
     }
 
 
@@ -374,177 +232,144 @@ public class MainActivity extends AppCompatActivity {
         isResume = false;
     }
 
+    private void autoClick(int x, int y) {
+        long uptimeMillis = SystemClock.uptimeMillis();
+        final long downTime = uptimeMillis;
+        MotionEvent motionEvent_down = MotionEvent.obtain(downTime, uptimeMillis, MotionEvent.ACTION_DOWN, x, y, 0);
+        dispatchTouchEvent(motionEvent_down);
+
+        MotionEvent motionEvent_up = MotionEvent.obtain(downTime, uptimeMillis, MotionEvent.ACTION_UP, x, y, 0);
+        dispatchTouchEvent(motionEvent_up);
+
+    }
+
+
+    private void autoScroll() {
+        long uptimeMillis = SystemClock.uptimeMillis();
+        final long downTime = uptimeMillis;
+        final int downX = 500;
+        int downY = 1500;
+
+        MotionEvent motionEvent_down = MotionEvent.obtain(downTime, uptimeMillis, MotionEvent.ACTION_DOWN, downX, downY, 0);
+        dispatchTouchEvent(motionEvent_down);
+
+        for (int i = 0; i <= 10; i++) {
+            downY -= 100;
+            uptimeMillis += 100;
+            MotionEvent motionEvent_move = MotionEvent.obtain(downTime, uptimeMillis, MotionEvent.ACTION_MOVE, downX, downY, 0);
+            dispatchTouchEvent(motionEvent_move);
+        }
+
+        final long finalUptimeMillis = uptimeMillis;
+        final int finalDownY = downY;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SystemClock.sleep(100);
+
+                MotionEvent motionEvent_move = MotionEvent.obtain(downTime, finalUptimeMillis, MotionEvent.ACTION_MOVE, downX, finalDownY, 0);
+                dispatchTouchEvent(motionEvent_move);
+
+                MotionEvent motionEvent_up = MotionEvent.obtain(downTime, finalUptimeMillis, MotionEvent.ACTION_UP, downX, finalDownY, 0);
+                dispatchTouchEvent(motionEvent_up);
+
+                SystemClock.sleep(100);
+                restartRecongnizer(MSG_FINDING_SCROLL);
+            }
+        }).start();
+
+    }
+
     @Override
-    public void onBackPressed() {
-        super.onBackPressed();
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        Log.i("lijing", "event == " + event);
+        return super.dispatchKeyEvent(event);
     }
 
-    public void release() {
-        stop();
-        mFrameProcessor.release();
-    }
+    @SuppressLint("HandlerLeak")
+    private void initHandler() {
+        handler = new Handler() {
+            public void handleMessage(Message msg) {
+                switch (msg.what) {
+                    case MSG_FIRST_GET_INPUT_BOUND:
+                        Bundle data = msg.getData();
+                        Rect bound = data.getParcelable("rect");
+                        autoClick(bound.centerX(), bound.centerY());
 
-    public void start() {
-        mProcessingThread = new Thread(mFrameProcessor);
-        mFrameProcessor.setActive(true);
-        mProcessingThread.start();
-    }
+                        postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                restartRecongnizer(MSG_SECOND_GET_INPUT_BOUND);
+                            }
+                        }, 2000);
 
-    public void stop() {
-        mFrameProcessor.setActive(false);
-        if (mProcessingThread != null) {
-            try {
-                // Wait for the thread to complete to ensure that we can't have multiple threads
-                // executing at the same time (i.e., which would happen if we called start too
-                // quickly after stop).
-                mProcessingThread.join();
-            } catch (InterruptedException e) {
-                Log.d(TAG, "Frame processing thread interrupted on release.");
-            }
-            mProcessingThread = null;
-        }
+                        break;
+                    case MSG_SECOND_GET_INPUT_BOUND:
+                        autoInputKeyword();
 
-        // clear the buffer to prevent oom exceptions
-//        mBytesToByteBuffer.clear();
+                        break;
 
-    }
+                    case MSG_SS:
+                        autoClickSSuo();
+                        break;
 
-    private class FrameProcessingRunnable implements Runnable {
-        private boolean isFirst = true;
-        private Detector<?> mDetector;
-        private long mStartTimeMillis = SystemClock.elapsedRealtime();
+                    case MSG_SS_FINISHED:
+                        Bundle urlBundle = msg.getData();
+                        String url = urlBundle.getString("url");
+                        webJumpController.requestJsoupData(url);
+                        break;
 
-        // This lock guards all of the member variables below.
-        private final Object mLock = new Object();
-        private boolean mActive = true;
+                    case MSG_FINDING_SCROLL:
 
-        // These pending variables hold the state associated with the new frame awaiting processing.
-        private long mPendingTimeMillis;
-        private int mPendingFrameId = 0;
-        private ByteBuffer mPendingFrameData;
-
-        FrameProcessingRunnable(Detector<?> detector) {
-            mDetector = detector;
-        }
-
-        /**
-         * Releases the underlying receiver.  This is only safe to do after the associated thread
-         * has completed, which is managed in camera source's release method above.
-         */
-        @SuppressLint("Assert")
-        void release() {
-            assert (mProcessingThread.getState() == Thread.State.TERMINATED);
-            mDetector.release();
-            mDetector = null;
-        }
-
-        /**
-         * Marks the runnable as active/not active.  Signals any blocked threads to continue.
-         */
-        void setActive(boolean active) {
-            synchronized (mLock) {
-                mActive = active;
-                mLock.notifyAll();
-            }
-        }
-
-        /**
-         * Sets the frame data received from the camera.  This adds the previous unused frame buffer
-         * (if present) back to the camera, and keeps a pending reference to the frame data for
-         * future use.
-         */
-        void setNextFrame(ByteBuffer data) {
-            synchronized (mLock) {
-                if (mPendingFrameData != null) {
-                    mPendingFrameData = null;
-                }
-
-//                if (!mBytesToByteBuffer.containsKey(data)) {
-//                    Log.d(TAG,
-//                            "Skipping frame.  Could not find ByteBuffer associated with the image " +
-//                                    "data from the camera.");
-//                    return;
-//                }
-
-                // Timestamp and frame ID are maintained here, which will give downstream code some
-                // idea of the timing of frames received and when frames were dropped along the way.
-                mPendingTimeMillis = SystemClock.elapsedRealtime() - mStartTimeMillis;
-                mPendingFrameId++;
-                mPendingFrameData = data;
-
-                // Notify the processor thread if it is waiting on the next frame (see below).
-                mLock.notifyAll();
-            }
-        }
-
-        /**
-         * As long as the processing thread is active, this executes detection on frames
-         * continuously.  The next pending frame is either immediately available or hasn't been
-         * received yet.  Once it is available, we transfer the frame info to local variables and
-         * run detection on that frame.  It immediately loops back for the next frame without
-         * pausing.
-         * <p/>
-         * If detection takes longer than the time in between new frames from the camera, this will
-         * mean that this loop will run without ever waiting on a frame, avoiding any context
-         * switching or frame acquisition time latency.
-         * <p/>
-         * If you find that this is using more CPU than you'd like, you should probably decrease the
-         * FPS setting above to allow for some idle time in between frames.
-         */
-        @Override
-        public void run() {
-            Frame outputFrame;
-            ByteBuffer data;
-
-            while (isFirst) {
-                Log.i("lijing", "run");
-                synchronized (mLock) {
-                    isFirst = false;
-                    while (mActive && (mPendingFrameData == null)) {
-                        try {
-                            // Wait for the next frame to be received from the camera, since we
-                            // don't have it yet.
-                            mLock.wait();
-                        } catch (InterruptedException e) {
-                            Log.d(TAG, "Frame processing loop terminated.", e);
-                            return;
+                        Bundle bundle = msg.getData();
+                        Rect goalRect = bundle.getParcelable("rect");
+                        if (goalRect == null) {
+                            autoScroll();
+                        } else {
+                            autoClick(goalRect.centerX(), goalRect.centerY());
+                            currState = MSG_FINDED;
                         }
-                    }
+                        break;
 
-                    if (!mActive) {
-                        // Exit the loop once this camera source is stopped or released.  We check
-                        // this here, immediately after the wait() above, to handle the case where
-                        // setActive(false) had been called, triggering the termination of this
-                        // loop.
-                        return;
-                    }
+                    case MSG_FINDED:
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                finish();
+                                startActivity(new Intent(MainActivity.this, MainActivity.class));
+                            }
+                        });
 
-                    outputFrame = new Frame.Builder()
-                            .setImageData(mPendingFrameData, width,
-                                    height, ImageFormat.NV21)
-                            .setId(mPendingFrameId)
-                            .setTimestampMillis(mPendingTimeMillis)
-                            .setRotation(0)
-                            .build();
-
-                    // Hold onto the frame data locally, so that we can use this for detection
-                    // below.  We need to clear mPendingFrameData to ensure that this buffer isn't
-                    // recycled back to the camera before we are done using that data.
-//                    data = mPendingFrameData;
-//                    mPendingFrameData = null;
-                }
-
-                // The code below needs to run outside of synchronization, because this will allow
-                // the camera to add pending frame(s) while we are running detection on the current
-                // frame.
-
-                try {
-                    mDetector.receiveFrame(outputFrame);
-                } catch (Throwable t) {
-                    Log.e(TAG, "Exception thrown from receiver.", t);
-                } finally {
+                        break;
                 }
             }
+        };
+    }
+
+
+    private void autoInputKeyword() {
+
+        final String strJS = String.format("javascript:document.getElementById('kw').value='%s';", KW);
+
+        webView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+
+                Log.e(MainActivity.class.getSimpleName(), "exe the js");
+                webView.evaluateJavascript(strJS, null);
+                handler.sendEmptyMessageDelayed(MSG_SS, 500);
+            }
+        }, 2000);
+
+    }
+
+    private void autoClickSSuo() {
+        if (finalInputRect != null) {
+            int[] display = Utils.getDisplay(this);
+
+            autoClick(display[0] * 9 / 10, finalInputRect.centerY());
+            currState = MSG_SS;
         }
     }
+
 }
