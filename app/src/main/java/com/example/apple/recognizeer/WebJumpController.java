@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
+import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -29,7 +30,7 @@ public class WebJumpController {
     private WebJumpListener listener;
     private boolean containGoalOnScreen;
 
-    public WebJumpController(Activity activity, WebView webview, @NonNull final WebJumpListener webJumpListener) {
+    public WebJumpController(Activity activity, final WebView webview, @NonNull final WebJumpListener webJumpListener) {
 
         this.activity = activity;
         this.webview = webview;
@@ -53,6 +54,14 @@ public class WebJumpController {
             public void onPageFinished(final WebView view, String url) {
                 isLoading = false;
 
+                String strJS = "javascript:document.getElementsByClassName('c-blocka c-color-gray-a hint-unsafe-expand  hint-unsafe-expand1')";
+                view.evaluateJavascript(strJS, new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        Log.i("lijing", "onReceiveValue: value=="+value);
+                    }
+                });
+
                 if (listener != null) {
                     listener.onWebViewPageRefreshFinished(url);
                 }
@@ -62,7 +71,6 @@ public class WebJumpController {
 
         webview.loadUrl("https://m.baidu.com/s?word=" + MainActivity.YAN);
     }
-
 
 
     void requestJsoupData(final String url) {
@@ -81,6 +89,8 @@ public class WebJumpController {
         try {//捕捉异常
 
             Document document = Jsoup.connect(url).get();//这里可用get也可以post方式，具体区别请自行了解
+
+
             Element result = document.getElementById("results");//请求的列表正文
 
             //判断当前请求的页面有没有目标
@@ -95,6 +105,13 @@ public class WebJumpController {
                     if (!TextUtils.isEmpty(mu)) {
 
                         if (mu.startsWith(MainActivity.GOAL) || mu.contains(MainActivity.GOAL)) {
+
+
+//                                if (listener != null) {
+//                                    this.listener.onFindedUnsafeElement();
+//                                    SystemClock.sleep(1000);
+//                                }
+
                             if (this.listener != null) {
                                 this.listener.onFindedTargetPage();
                             }
@@ -157,6 +174,7 @@ public class WebJumpController {
     }
 
     public interface WebJumpListener {
+        void onFindedUnsafeElement();
         void onFindedTargetPage();
 
         void onWebViewPageRefreshFinished(String url);

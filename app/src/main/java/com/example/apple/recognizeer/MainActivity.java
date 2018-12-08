@@ -40,8 +40,11 @@ import java.nio.ByteBuffer;
 public class MainActivity extends AppCompatActivity {
 
     public static final String YAN = "kdsfgjkgdsklgkdlg";
-    public static final String KW = "电影网站";
-    public static final String GOAL = "https://m.xigua110.com";
+    public static final String YAN_UNSAFE = "lijingggggg";
+    public static final String KW = "活性炭";
+    public static final String GOAL = "www.lyll.com.cn";
+    public static final String GOAL1 = "www.lyl.com.cn";
+    public static final String GOAL2 = "www.yll.com.cn";
 
     private WebView webView;
     private ImageView ivShow;
@@ -84,6 +87,17 @@ public class MainActivity extends AppCompatActivity {
 
         webJumpController = new WebJumpController(this, webView, new WebJumpController.WebJumpListener() {
             @Override
+            public void onFindedUnsafeElement() {
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        autoReplaceUnsafeElementText();
+                    }
+                },2000);
+
+            }
+
+            @Override
             public void onFindedTargetPage() {
                 restartRecongnizer(MSG_FINDING_SCROLL);
             }
@@ -101,8 +115,10 @@ public class MainActivity extends AppCompatActivity {
                     msg.setData(bundle);
                     handler.sendMessage(msg);
                 } else if (currState == MSG_FINDED) {
-                    handler.sendEmptyMessageDelayed(MSG_FINDED,2000);
+                    handler.sendEmptyMessageDelayed(MSG_FINDED, 2000);
                 }
+
+
             }
         });
 
@@ -159,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
                             .build();
 
                     Rect goalRect = null;
+                    Rect unsafeRect = null;
                     SparseArray<TextBlock> items = textRecognizer.detect(frame);
                     for (int i = 0; i < items.size(); ++i) {
                         TextBlock item = items.valueAt(i);
@@ -184,8 +201,15 @@ public class MainActivity extends AppCompatActivity {
                                 break;
                             }
                         } else if (currState == MSG_FINDING_SCROLL) {
-                            if (GOAL.equals(value) || value.contains(GOAL)) {
+                            value = value.toLowerCase();
+                            if (GOAL.equals(value) || value.contains(GOAL)
+                                    ||GOAL1.equals(value) || value.contains(GOAL1)
+                                    ||GOAL2.equals(value) || value.contains(GOAL2)) {
                                 goalRect = item.getBoundingBox();
+                                break;
+                            } else if (YAN_UNSAFE.equals(value) || value.contains(YAN_UNSAFE)) {
+                                unsafeRect = item.getBoundingBox();
+                                autoClick(unsafeRect.centerX(), unsafeRect.centerY());
                                 break;
                             }
                         }
@@ -195,11 +219,11 @@ public class MainActivity extends AppCompatActivity {
                         Message msg = Message.obtain();
                         msg.what = MSG_FINDING_SCROLL;
                         Bundle bundle = new Bundle();
-                        bundle.putParcelable("rect", goalRect);
+                        bundle.putParcelable("goalRect", goalRect);
+                        bundle.putParcelable("unsafeRect", unsafeRect);
                         msg.setData(bundle);
                         handler.sendMessage(msg);
                     }
-
 
                     isNeedRecongnizeer = false;
 
@@ -293,8 +317,9 @@ public class MainActivity extends AppCompatActivity {
                 switch (msg.what) {
                     case MSG_FIRST_GET_INPUT_BOUND:
                         Bundle data = msg.getData();
-                        Rect bound = data.getParcelable("rect");
-                        autoClick(bound.centerX(), bound.centerY());
+                        Rect rect = data.getParcelable("rect");
+
+                        autoClick(rect.centerX(), rect.centerY());
 
                         postDelayed(new Runnable() {
                             @Override
@@ -322,8 +347,11 @@ public class MainActivity extends AppCompatActivity {
                     case MSG_FINDING_SCROLL:
 
                         Bundle bundle = msg.getData();
-                        Rect goalRect = bundle.getParcelable("rect");
-                        if (goalRect == null) {
+                        Rect goalRect = bundle.getParcelable("goalRect");
+                        Rect unsafeRect = bundle.getParcelable("unsafeRect");
+                        if (unsafeRect != null) {
+                            restartRecongnizer(MSG_FINDING_SCROLL);
+                        } else if (goalRect == null) {
                             autoScroll();
                         } else {
                             autoClick(goalRect.centerX(), goalRect.centerY());
@@ -335,6 +363,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
+                                RecognizerApp.getInstance().deleteCookie();
                                 finish();
                                 startActivity(new Intent(MainActivity.this, MainActivity.class));
                             }
@@ -351,15 +380,15 @@ public class MainActivity extends AppCompatActivity {
 
         final String strJS = String.format("javascript:document.getElementById('kw').value='%s';", KW);
 
-        webView.postDelayed(new Runnable() {
-            @Override
-            public void run() {
+        webView.evaluateJavascript(strJS, null);
+        handler.sendEmptyMessageDelayed(MSG_SS, 500);
 
-                Log.e(MainActivity.class.getSimpleName(), "exe the js");
-                webView.evaluateJavascript(strJS, null);
-                handler.sendEmptyMessageDelayed(MSG_SS, 500);
-            }
-        }, 2000);
+    }
+
+    private void autoReplaceUnsafeElementText() {
+
+        String strJS = "javascript:document.getElementsByClassName('c-blocka c-color-gray-a hint-unsafe-expand  hint-unsafe-expand1')[0].firstElementChild.innerText='"+YAN_UNSAFE+"'";
+        webView.evaluateJavascript(strJS, null);
 
     }
 

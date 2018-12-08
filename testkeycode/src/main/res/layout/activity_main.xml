@@ -6,9 +6,8 @@
     android:layout_height="match_parent"
     tools:context="com.example.testkeycode.MainActivity">
 
-    <EditText
-        android:id="@+id/edittext"
+    <WebView
+        android:id="@+id/webview"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="texttetetetetet" />
+        android:layout_height="match_parent" />
 </android.support.constraint.ConstraintLayout>
