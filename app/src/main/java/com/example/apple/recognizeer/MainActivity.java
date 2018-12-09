@@ -1,7 +1,6 @@
 package com.example.apple.recognizeer;
 
 import android.annotation.SuppressLint;
-import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -14,7 +13,6 @@ import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Handler;
-import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
 import android.support.annotation.Nullable;
@@ -26,9 +24,8 @@ import android.util.SparseArray;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.webkit.WebSettings;
+import android.view.WindowManager;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.ImageView;
 
 import com.google.android.gms.vision.Frame;
@@ -37,7 +34,7 @@ import com.google.android.gms.vision.text.TextRecognizer;
 
 import java.nio.ByteBuffer;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActivity {
 
     public static final String YAN = "kdsfgjkgdsklgkdlg";
     public static final String YAN_UNSAFE = "lijingggggg";
@@ -62,23 +59,30 @@ public class MainActivity extends AppCompatActivity {
     private int height;
     private boolean isNeedRecongnizeer = true;//第一次识别
 
-    private final int MSG_FIRST_GET_INPUT_BOUND = 1;
-    private final int MSG_SECOND_GET_INPUT_BOUND = 2;
-    private final int MSG_SS = 3;//短暂性的
-    private final int MSG_SS_FINISHED = 4;
-    private final int MSG_FINDING_SCROLL = 5;
-    private final int MSG_FINDED = 6;
+    private final int MSG_INIT = 1;
+    private final int MSG_FIRST_GET_INPUT_BOUND = 2;
+    private final int MSG_SECOND_GET_INPUT_BOUND = 3;
+    private final int MSG_SS = 4;//短暂性的
+    private final int MSG_SS_FINISHED = 5;
+    private final int MSG_FINDING_SCROLL = 6;
+    private final int MSG_FINDED = 7;
 
-    private int currState = MSG_FIRST_GET_INPUT_BOUND;
+    private int currState = MSG_INIT;
 
     private Handler handler;
 
     private Rect finalInputRect;
 
+    private TestNecrosis testNecrosisThread;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        testNecrosisThread = new TestNecrosis();
+        testNecrosisThread.start();
 
         initHandler();
 
@@ -93,8 +97,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         autoReplaceUnsafeElementText();
                     }
-                },2000);
-
+                }, 2000);
             }
 
             @Override
@@ -104,8 +107,9 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onWebViewPageRefreshFinished(String url) {
-                if (currState == MSG_FIRST_GET_INPUT_BOUND) {
-                    restartRecongnizer(MSG_FIRST_GET_INPUT_BOUND);
+
+                if (currState == MSG_INIT) {
+                    handler.sendEmptyMessageDelayed(MSG_INIT, 500);
                 } else if (currState == MSG_SS) {
                     currState = MSG_SS_FINISHED;
                     Message msg = Message.obtain();
@@ -118,10 +122,12 @@ public class MainActivity extends AppCompatActivity {
                     handler.sendEmptyMessageDelayed(MSG_FINDED, 2000);
                 }
 
+                if (testNecrosisThread!=null){
+                    testNecrosisThread.makeZero();
+                }
 
             }
         });
-
 
         textRecognizer = new TextRecognizer.Builder(this).build();
 
@@ -174,6 +180,7 @@ public class MainActivity extends AppCompatActivity {
                             .setBitmap(bitmap)
                             .build();
 
+                    Rect inputRect = null;
                     Rect goalRect = null;
                     Rect unsafeRect = null;
                     SparseArray<TextBlock> items = textRecognizer.detect(frame);
@@ -183,18 +190,18 @@ public class MainActivity extends AppCompatActivity {
                         if (currState == MSG_SECOND_GET_INPUT_BOUND || currState == MSG_FIRST_GET_INPUT_BOUND) {
 
                             if (YAN.equals(value) || value.contains(YAN)) {
-                                Rect boundingBox = item.getBoundingBox();
-                                Log.i("lijing", boundingBox.toString());
+                                inputRect = item.getBoundingBox();
+                                Log.i("lijing", inputRect.toString());
 
                                 if (currState == MSG_FIRST_GET_INPUT_BOUND) {
                                     Message msg = Message.obtain();
                                     msg.what = MSG_FIRST_GET_INPUT_BOUND;
                                     Bundle bundle = new Bundle();
-                                    bundle.putParcelable("rect", boundingBox);
+                                    bundle.putParcelable("rect", inputRect);
                                     msg.setData(bundle);
                                     handler.sendMessage(msg);
                                 } else if (currState == MSG_SECOND_GET_INPUT_BOUND) {
-                                    finalInputRect = boundingBox;
+                                    finalInputRect = inputRect;
                                     handler.sendEmptyMessage(MSG_SECOND_GET_INPUT_BOUND);
                                 }
 
@@ -203,8 +210,8 @@ public class MainActivity extends AppCompatActivity {
                         } else if (currState == MSG_FINDING_SCROLL) {
                             value = value.toLowerCase();
                             if (GOAL.equals(value) || value.contains(GOAL)
-                                    ||GOAL1.equals(value) || value.contains(GOAL1)
-                                    ||GOAL2.equals(value) || value.contains(GOAL2)) {
+                                    || GOAL1.equals(value) || value.contains(GOAL1)
+                                    || GOAL2.equals(value) || value.contains(GOAL2)) {
                                 goalRect = item.getBoundingBox();
                                 break;
                             } else if (YAN_UNSAFE.equals(value) || value.contains(YAN_UNSAFE)) {
@@ -215,7 +222,11 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
-                    if (currState == MSG_FINDING_SCROLL) {
+                    if (currState == MSG_SECOND_GET_INPUT_BOUND || currState == MSG_FIRST_GET_INPUT_BOUND) {
+                        if (inputRect == null){
+                            restart();
+                        }
+                    } else if (currState == MSG_FINDING_SCROLL) {
                         Message msg = Message.obtain();
                         msg.what = MSG_FINDING_SCROLL;
                         Bundle bundle = new Bundle();
@@ -235,7 +246,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }, null);
 
-        restartRecongnizer(MSG_FIRST_GET_INPUT_BOUND);
     }
 
     private void restartRecongnizer(int state) {
@@ -315,6 +325,9 @@ public class MainActivity extends AppCompatActivity {
         handler = new Handler() {
             public void handleMessage(Message msg) {
                 switch (msg.what) {
+                    case MSG_INIT:
+                        restartRecongnizer(MSG_FIRST_GET_INPUT_BOUND);
+                        break;
                     case MSG_FIRST_GET_INPUT_BOUND:
                         Bundle data = msg.getData();
                         Rect rect = data.getParcelable("rect");
@@ -363,9 +376,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                RecognizerApp.getInstance().deleteCookie();
-                                finish();
-                                startActivity(new Intent(MainActivity.this, MainActivity.class));
+                                restart();
                             }
                         });
 
@@ -373,6 +384,27 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+    }
+
+    private void restart() {
+
+        nip();
+        startActivity(new Intent(this, EmptyActivity.class));
+    }
+
+    public void nip(){
+        if (mVirtualDisplay != null) {
+            mVirtualDisplay.release();
+        }
+        handler.removeCallbacksAndMessages(null);
+        RecognizerApp.getInstance().deleteCookie();
+        if (testNecrosisThread != null) {
+            testNecrosisThread.finish();
+            testNecrosisThread.interrupt();
+            testNecrosisThread = null;
+        }
+
+        finish();
     }
 
 
@@ -387,7 +419,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void autoReplaceUnsafeElementText() {
 
-        String strJS = "javascript:document.getElementsByClassName('c-blocka c-color-gray-a hint-unsafe-expand  hint-unsafe-expand1')[0].firstElementChild.innerText='"+YAN_UNSAFE+"'";
+        String strJS = "javascript:document.getElementsByClassName('c-blocka c-color-gray-a hint-unsafe-expand  hint-unsafe-expand1')[0].firstElementChild.innerText='" + YAN_UNSAFE + "'";
         webView.evaluateJavascript(strJS, null);
 
     }
@@ -398,6 +430,37 @@ public class MainActivity extends AppCompatActivity {
 
             autoClick(display[0] * 9 / 10, finalInputRect.centerY());
             currState = MSG_SS;
+        }
+    }
+
+
+    class TestNecrosis extends Thread {
+        private long time_test_necrosis;
+        private boolean execute = true;
+
+        public TestNecrosis() {
+            makeZero();
+        }
+
+        public void makeZero() {
+            time_test_necrosis = System.currentTimeMillis();
+        }
+
+        public void finish() {
+            execute = false;
+        }
+
+        @Override
+        public void run() {
+            while (execute) {
+                Log.e("lijing", "code == "+ MainActivity.this.hashCode());
+                long systemTime = System.currentTimeMillis();
+                if (systemTime - time_test_necrosis > 20000) {
+                    restart();
+                    return;
+                }
+                SystemClock.sleep(300);
+            }
         }
     }
 

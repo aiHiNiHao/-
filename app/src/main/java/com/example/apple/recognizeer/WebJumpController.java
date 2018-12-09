@@ -37,6 +37,7 @@ public class WebJumpController {
         this.listener = webJumpListener;
 
         WebSettings settings = webview.getSettings();
+        settings.setUserAgentString(RecognizerApp.getInstance().getCurrUseragent());
         settings.setJavaScriptEnabled(true);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
@@ -54,14 +55,7 @@ public class WebJumpController {
             public void onPageFinished(final WebView view, String url) {
                 isLoading = false;
 
-                String strJS = "javascript:document.getElementsByClassName('c-blocka c-color-gray-a hint-unsafe-expand  hint-unsafe-expand1')";
-                view.evaluateJavascript(strJS, new ValueCallback<String>() {
-                    @Override
-                    public void onReceiveValue(String value) {
-                        Log.i("lijing", "onReceiveValue: value=="+value);
-                    }
-                });
-
+                Log.d("lijing", "onPageFinished: userAgent == "+ view.getSettings().getUserAgentString());
                 if (listener != null) {
                     listener.onWebViewPageRefreshFinished(url);
                 }
