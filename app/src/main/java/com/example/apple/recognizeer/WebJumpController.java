@@ -6,7 +6,6 @@ import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
-import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -30,13 +29,14 @@ public class WebJumpController {
     private WebJumpListener listener;
     private boolean containGoalOnScreen;
 
-    public WebJumpController(Activity activity, WebView webview, @NonNull final WebJumpListener webJumpListener) {
+    public WebJumpController(Activity activity, final WebView webview, @NonNull final WebJumpListener webJumpListener) {
 
         this.activity = activity;
         this.webview = webview;
         this.listener = webJumpListener;
 
         WebSettings settings = webview.getSettings();
+        settings.setUserAgentString(RecognizerApp.getInstance().getCurrUseragent());
         settings.setJavaScriptEnabled(true);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
@@ -54,9 +54,6 @@ public class WebJumpController {
             public void onPageFinished(final WebView view, String url) {
                 isLoading = false;
 
-                CookieManager cookieManager = CookieManager.getInstance();
-                String CookieStr = cookieManager.getCookie(url);
-                Log.d("lijing", "onPageFinished: Cookie == "+ CookieStr);
 
                 if (listener != null) {
                     listener.onWebViewPageRefreshFinished(url);
@@ -65,9 +62,8 @@ public class WebJumpController {
 
         });
 
-        webview.loadUrl("https://m.baidu.com/s?word=" + MainActivity.YAN);
-    }
 
+    }
 
 
     void requestJsoupData(final String url) {
@@ -86,6 +82,8 @@ public class WebJumpController {
         try {//捕捉异常
 
             Document document = Jsoup.connect(url).get();//这里可用get也可以post方式，具体区别请自行了解
+
+
             Element result = document.getElementById("results");//请求的列表正文
 
             //判断当前请求的页面有没有目标
@@ -101,18 +99,12 @@ public class WebJumpController {
                     if (!TextUtils.isEmpty(mu)) {
 
                         if (mu.startsWith(MainActivity.GOAL) || mu.contains(MainActivity.GOAL)) {
-                            final String strJS = "javascript:document.getElementByClass('c-result result c-clk-recommend')["+i+"].click()";
-                            webview.postDelayed(new Runnable() {
-                                @Override
-                                public void run() {
 
-                                    webview.evaluateJavascript(strJS, null);
-                                }
-                            }, 2000);
 
-//                            if (this.listener != null) {
-//                                this.listener.onFindedTargetPage();
-//                            }
+
+                            if (this.listener != null) {
+                                this.listener.onFindedTargetPage();
+                            }
                             return;
                         }
                     }
@@ -172,6 +164,7 @@ public class WebJumpController {
     }
 
     public interface WebJumpListener {
+        void onFindedUnsafeElement();
         void onFindedTargetPage();
 
         void onWebViewPageRefreshFinished(String url);
