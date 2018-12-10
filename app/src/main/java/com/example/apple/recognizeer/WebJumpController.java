@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
+import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -53,6 +54,10 @@ public class WebJumpController {
             public void onPageFinished(final WebView view, String url) {
                 isLoading = false;
 
+                CookieManager cookieManager = CookieManager.getInstance();
+                String CookieStr = cookieManager.getCookie(url);
+                Log.d("lijing", "onPageFinished: Cookie == "+ CookieStr);
+
                 if (listener != null) {
                     listener.onWebViewPageRefreshFinished(url);
                 }
@@ -85,9 +90,10 @@ public class WebJumpController {
 
             //判断当前请求的页面有没有目标
             Elements list = result.getElementsByAttribute("order");
-            for (Element element : list) {
-
+            for (int i = 0; i< list.size() ; i++) {
+                Element element = list.get(i);
                 String text = element.attr("data-log");
+
                 if (!TextUtils.isEmpty(text)) {
                     JSONObject jsonObject = new JSONObject(text);
                     String mu = jsonObject.getString("mu");
@@ -95,9 +101,18 @@ public class WebJumpController {
                     if (!TextUtils.isEmpty(mu)) {
 
                         if (mu.startsWith(MainActivity.GOAL) || mu.contains(MainActivity.GOAL)) {
-                            if (this.listener != null) {
-                                this.listener.onFindedTargetPage();
-                            }
+                            final String strJS = "javascript:document.getElementByClass('c-result result c-clk-recommend')["+i+"].click()";
+                            webview.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+
+                                    webview.evaluateJavascript(strJS, null);
+                                }
+                            }, 2000);
+
+//                            if (this.listener != null) {
+//                                this.listener.onFindedTargetPage();
+//                            }
                             return;
                         }
                     }

@@ -26,6 +26,7 @@ import android.util.SparseArray;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -40,8 +41,8 @@ import java.nio.ByteBuffer;
 public class MainActivity extends AppCompatActivity {
 
     public static final String YAN = "kdsfgjkgdsklgkdlg";
-    public static final String KW = "电影网站";
-    public static final String GOAL = "https://m.xigua110.com";
+    public static final String KW = "爱奇艺播放器官方";
+    public static final String GOAL = "m.aiqiyibofangqi.com";
 
     private WebView webView;
     private ImageView ivShow;
@@ -75,6 +76,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.removeAllCookies(null);
+
+
         setContentView(R.layout.activity_main);
 
         initHandler();
@@ -105,7 +111,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-
 
         textRecognizer = new TextRecognizer.Builder(this).build();
 
