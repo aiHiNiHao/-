@@ -51,6 +51,9 @@ public class RecognizerApp extends Application {
         return recognizerApp;
     }
 
+    /**
+     * 清除cookie
+     */
     public void deleteCookie() {
 
         int random = (int) (Math.random() * 3);

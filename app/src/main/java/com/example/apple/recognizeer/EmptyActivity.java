@@ -32,7 +32,8 @@ public class EmptyActivity extends BaseActivity {
             @Override
             public void run() {
                 List<Activity> activityStack = RecognizerApp.getInstance().getActivityStack();
-                Log.d("lijing", "--****************************"+activityStack.size());
+
+                //强制吧栈顶的activity都释放掉
                 while (activityStack.size() > 1) {
                     for (int i = 1; i < activityStack.size(); i++) {
                         final Activity activity = activityStack.get(i);
@@ -53,7 +54,6 @@ public class EmptyActivity extends BaseActivity {
                     SystemClock.sleep(50);
                 }
 
-                Log.d("lijing", "---------------------------"+activityStack.size());
 
                 runOnUiThread(new Runnable() {
                     @Override

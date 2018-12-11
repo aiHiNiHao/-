@@ -27,7 +27,6 @@ public class WebJumpController {
     private WebView webview;
     private boolean isLoading;
     private WebJumpListener listener;
-    private boolean containGoalOnScreen;
 
     public WebJumpController(Activity activity, final WebView webview, @NonNull final WebJumpListener webJumpListener) {
 
@@ -36,14 +35,13 @@ public class WebJumpController {
         this.listener = webJumpListener;
 
         WebSettings settings = webview.getSettings();
-        settings.setUserAgentString(RecognizerApp.getInstance().getCurrUseragent());
+        String currUseragent = RecognizerApp.getInstance().getCurrUseragent();
+        settings.setUserAgentString(currUseragent);
         settings.setJavaScriptEnabled(true);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        /**
-         * 监听WebView的加载状态    分别为 ： 加载的 前 中 后期
-         * */
+
         webview.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
@@ -88,7 +86,7 @@ public class WebJumpController {
 
             //判断当前请求的页面有没有目标
             Elements list = result.getElementsByAttribute("order");
-            for (int i = 0; i< list.size() ; i++) {
+            for (int i = 0; i < list.size(); i++) {
                 Element element = list.get(i);
                 String text = element.attr("data-log");
 
@@ -98,9 +96,7 @@ public class WebJumpController {
 
                     if (!TextUtils.isEmpty(mu)) {
 
-                        if (mu.startsWith(MainActivity.GOAL) || mu.contains(MainActivity.GOAL)) {
-
-
+                        if (mu.startsWith(MainActivity.GOAL) || mu.contains(MainActivity.GOAL)) {//当前页面中包含目标网站
 
                             if (this.listener != null) {
                                 this.listener.onFindedTargetPage();
@@ -118,13 +114,13 @@ public class WebJumpController {
             for (Element element : pageControllers) {
 
                 Elements pageOnlyLeft = element.select("[class=new-nextpage-only]");
-                if (pageOnlyLeft != null) {
+                if (pageOnlyLeft != null) {//搜索结果第一页
                     for (Element link : pageOnlyLeft) {
                         String pageOnlyLeftHref = link.attr("href");
                         loadNextPageUrl(pageOnlyLeftHref);
                         Log.i("lijing", "pageOnlyLeftHref == " + pageOnlyLeftHref);
                     }
-                } else {
+                } else {//搜索结果不是第一页
                     Elements pageLeft = element.select("[class=new-pagenav-left]");
                     Elements pageRight = element.select("[class=new-pagenav-right]");
 
@@ -164,9 +160,19 @@ public class WebJumpController {
     }
 
     public interface WebJumpListener {
+        /**
+         * 存在百度隐藏折叠内容的情况
+         */
         void onFindedUnsafeElement();
+
+        /**
+         * 当前页面包含有目标
+         */
         void onFindedTargetPage();
 
+        /**
+         * webview页面刷新
+         */
         void onWebViewPageRefreshFinished(String url);
     }
 }
