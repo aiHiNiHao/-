@@ -141,6 +141,11 @@ public class MainActivity extends BaseActivity {
                 }
 
             }
+
+            @Override
+            public void onPageCountOutOfBound() {
+                restart();
+            }
         });
 
         // 初始加载带有关键字的页面

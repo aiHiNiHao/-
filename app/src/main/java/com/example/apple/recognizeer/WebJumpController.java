@@ -144,6 +144,12 @@ public class WebJumpController {
     private void loadNextPageUrl(String url) {
         Log.i("lijingweb url", url);
 
+        if (page > 5){
+            if (listener != null) {
+                listener.onPageCountOutOfBound();
+            }
+            return;
+        }
         final String finalUrl = url;
         mainActivity.runOnUiThread(new Runnable() {
             @Override
@@ -156,6 +162,7 @@ public class WebJumpController {
             SystemClock.sleep(50);
         }
         requestJsoupData(finalUrl);
+        page++;
     }
 
 
@@ -174,6 +181,11 @@ public class WebJumpController {
          * webview页面刷新
          */
         void onWebViewPageRefreshFinished(String url);
+
+        /**
+         * webview页面刷新
+         */
+        void onPageCountOutOfBound();
     }
 }
 
