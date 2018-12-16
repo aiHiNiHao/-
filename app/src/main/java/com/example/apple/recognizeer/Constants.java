@@ -180,5 +180,48 @@ public class Constants {
             /**联想ZUK Z2 Pro	Android	UC浏览器*/
             "Mozilla/5.0 (Linux; U; Android 8.0.0; zh-CN; ZUK Z2121 Build/OPR1.170623.032) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.108 UCBrowser/12.1.3.993 Mobile Safari/537.36",
 
+            /**SM-N9109W	Android	手机百度 */
+            "Mozilla/5.0 (Linux; Android 6.0.1; SM-N9109W Build/MMB29M; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/48.0.2564.116 Mobile Safari/537.36 T7/10.6 baiduboxapp/10.6.0.11 (Baidu; P1 6.0.1)",
+
+            /**16th Plus	Android	微信 */
+            "Mozilla/5.0 (Linux; Android 8.1; 16th Plus Build/OPM1.171019.026; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.143 Crosswalk/24.53.595.0 XWEB/257 MMWEBSDK/23 Mobile Safari/537.36 MicroMessenger/6.7.2.1340(0x2607023A) NetType/WIFI Language/zh_CN",
+
+            /**16th Plus	Android	QQ浏览器 	   */
+            "Mozilla/5.0 (Linux; Android 8.1; 16th Plus Build/OPM1.171019.026; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/6.2 TBS/044304 Mobile Safari/537.36 V1_AND_SQ_7.1.0_0_TIM_D TIM/2.2.9.1822 QQ/6.5.5 NetType/WIFI WebP/0.3.0 Pixel/1080",
+
+            /**乐视2	Android	QQ浏览器        */
+            "Mozilla/5.0 (Linux; U; Android 6.0; zh-cn; Le X620 Build/unknown) AppleWebKit/537.36 (KHTML, like Gecko)Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.2 Mobile Safari/537.36",
+
+            /**华为nova 2 Plus	Android	QQ浏览器 	*/
+            "Mozilla/5.0 (Linux; U; Android 8.0.0; zh-cn; BAC-AL00 Build/HUAWEIBAC-AL00) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.7 Mobile Safari/537.36",
+            /**华为P9	Android	微信 	  */
+            "Mozilla/5.0 (Linux; Android 7.0; EVA-AL10 Build/HUAWEIEVA-AL10; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/6.2 TBS/044208 Mobile Safari/537.36 MicroMessenger/6.7.2.1340(0x2607023A) NetType/WIFI Language/zh_CN",
+
+            /**小米MIX 2	Android	UC浏览器     */
+            "Mozilla/5.0 (Linux; U; Android 8.0.0; zh-CN; MIX 2 Build/OPR1.170623.027) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.108 UCBrowser/12.1.3.993 Mobile Safari/537.36",
+
+            /**华为Mate 8	Android	QQ浏览器 */
+            "Mozilla/5.0 (Linux; U; Android 7.0; zh-cn; HUAWEI NXT-TL00 Build/HUAWEINXT-TL00) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.8 Mobile Safari/537.36",
+
+            /**M5 Note	Android	微信  */
+            "Mozilla/5.0 (Linux; Android 6.0; M5 Note Build/MRA58K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/6.2 TBS/044208 Mobile Safari/537.36 MicroMessenger/6.7.2.1340(0x2607023A) NetType/WIFI Language/zh_CN",
+
+            /**华为Mate 8	Android	微信  */
+            "Mozilla/5.0 (Linux; Android 6.0; HUAWEI NXT-AL10 Build/HUAWEINXT-AL10; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/6.2 TBS/044304 Mobile Safari/537.36 MicroMessenger/6.7.2.1340(0x2607023A) NetType/4G Language/zh_CN",
+
+            /**NX569H	Android	傲游浏览器  */
+            "Mozilla/5.0 (Linux; Android 6.0.1; NX569H Build/MMB29M) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/60.0.3112.116 Mobile Safari/537.36 Maxthon/3235",
+
+            /**iPhone	IOS	微信  */
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Mobile/14D27 MicroMessenger/6.7.2 NetType/4G Language/zh_CN",
+
+            /**华为P20	Android	微信  */
+            "Mozilla/5.0 (Linux; Android 8.1; EML-AL00 Build/HUAWEIEML-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.143 Crosswalk/24.53.595.0 XWEB/257 MMWEBSDK/23 Mobile Safari/537.36 MicroMessenger/6.7.2.1340(0x2607023A) NetType/WIFI Language/zh_CN",
+
+            /**JSN-AL00	Android	UC浏览器 	 */
+            "Mozilla/5.0 (Linux; U; Android 8.1.0; zh-CN; JSN-AL00 Build/HONORJSN-AL00) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.108 UCBrowser/12.1.3.993 Mobile Safari/537.36",
+
+            /**华为荣耀8	Android	微信  */
+            "Mozilla/5.0 (Linux; Android 7.0; FRD-AL00 Build/HUAWEIFRD-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/6.2 TBS/044304 Mobile Safari/537.36 MicroMessenger/6.7.2.1340(0x2607023A) NetType/4G Language/zh_CN",
     };
 }

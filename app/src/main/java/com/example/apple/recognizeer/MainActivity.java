@@ -495,9 +495,9 @@ public class MainActivity extends BaseActivity {
         public void run() {
             while (execute) {
                 long systemTime = System.currentTimeMillis();
-                if (systemTime - time_test_necrosis > 10000) {//当webview10秒没反应就强制退出
+                Log.e("lijing", "------------" + MainActivity.this.hashCode());
+                if (systemTime - time_test_necrosis > 20000) {//当webview10秒没反应就强制退出
 
-                    Log.e("lijing", "------------" + MainActivity.this.hashCode());
                     handler.sendEmptyMessage(MSG_FINDED);
                     return;
                 }

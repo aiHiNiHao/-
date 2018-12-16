@@ -55,6 +55,8 @@ public class WebJumpController {
         webview.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                String hostIP = RecognizerApp.getInstance().getHostIP();
+                textView.setText(hostIP);
                 isLoading = true;
             }
 
@@ -134,13 +136,10 @@ public class WebJumpController {
                     }
                 }
             }
-
-
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
     private void loadNextPageUrl(String url) {
         Log.i("lijingweb url", url);
@@ -153,12 +152,10 @@ public class WebJumpController {
             }
         });
 
-
         while (isLoading) {
             SystemClock.sleep(50);
         }
         requestJsoupData(finalUrl);
-
     }
 
 
