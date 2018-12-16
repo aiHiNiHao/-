@@ -2,6 +2,10 @@ package com.example.apple.recognizeer;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
@@ -9,6 +13,7 @@ import android.util.Log;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.TextView;
 
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
@@ -23,15 +28,20 @@ import org.jsoup.select.Elements;
  */
 public class WebJumpController {
 
-    private Activity activity;
+    private MainActivity mainActivity;
     private WebView webview;
+    private TextView textView;
     private boolean isLoading;
     private WebJumpListener listener;
 
-    public WebJumpController(Activity activity, final WebView webview, @NonNull final WebJumpListener webJumpListener) {
 
-        this.activity = activity;
+    int page;
+
+    public WebJumpController(MainActivity activity, final WebView webview, TextView tvShow, @NonNull final WebJumpListener webJumpListener) {
+
+        this.mainActivity = activity;
         this.webview = webview;
+        this.textView = tvShow;
         this.listener = webJumpListener;
 
         WebSettings settings = webview.getSettings();
@@ -51,7 +61,7 @@ public class WebJumpController {
             @Override
             public void onPageFinished(final WebView view, String url) {
                 isLoading = false;
-
+                Log.i("lijing web url", url);
 
                 if (listener != null) {
                     listener.onWebViewPageRefreshFinished(url);
@@ -59,28 +69,22 @@ public class WebJumpController {
             }
 
         });
-
-
     }
 
-
     void requestJsoupData(final String url) {
-        //这里需要放在子线程中完成，否则报这个错android.os.NetworkOnMainThreadException
-        new Thread(new Runnable() {
+        mainActivity.executorService.execute(new Runnable() {
             @Override
             public void run() {
                 jsoupListData(url);
             }
-        }).start();
+        });
     }
-
 
     private void jsoupListData(String url) {
 
         try {//捕捉异常
 
             Document document = Jsoup.connect(url).get();//这里可用get也可以post方式，具体区别请自行了解
-
 
             Element result = document.getElementById("results");//请求的列表正文
 
@@ -95,7 +99,7 @@ public class WebJumpController {
                     String mu = jsonObject.getString("mu");
 
                     if (!TextUtils.isEmpty(mu)) {
-
+                        Log.i("lijing", "mu: " + mu);
                         if (mu.startsWith(MainActivity.GOAL) || mu.contains(MainActivity.GOAL)) {//当前页面中包含目标网站
 
                             if (this.listener != null) {
@@ -114,11 +118,10 @@ public class WebJumpController {
             for (Element element : pageControllers) {
 
                 Elements pageOnlyLeft = element.select("[class=new-nextpage-only]");
-                if (pageOnlyLeft != null) {//搜索结果第一页
+                if (pageOnlyLeft != null && pageOnlyLeft.size() > 0) {//搜索结果第一页
                     for (Element link : pageOnlyLeft) {
                         String pageOnlyLeftHref = link.attr("href");
                         loadNextPageUrl(pageOnlyLeftHref);
-                        Log.i("lijing", "pageOnlyLeftHref == " + pageOnlyLeftHref);
                     }
                 } else {//搜索结果不是第一页
                     Elements pageLeft = element.select("[class=new-pagenav-left]");
@@ -128,7 +131,6 @@ public class WebJumpController {
                     for (Element link : a) {
                         String href = link.attr("href");
                         loadNextPageUrl(href);
-                        Log.i("lijing", "rightHref == " + href);
                     }
                 }
             }
@@ -141,10 +143,10 @@ public class WebJumpController {
 
 
     private void loadNextPageUrl(String url) {
-
+        Log.i("lijingweb url", url);
 
         final String finalUrl = url;
-        activity.runOnUiThread(new Runnable() {
+        mainActivity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 webview.loadUrl(finalUrl);
@@ -158,6 +160,7 @@ public class WebJumpController {
         requestJsoupData(finalUrl);
 
     }
+
 
     public interface WebJumpListener {
         /**

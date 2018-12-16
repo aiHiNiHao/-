@@ -14,11 +14,11 @@ public class Utils {
     }
 
     public static String getRandomString() {
-        String[] strings = new String[]{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"};
+        String[] strings = new String[]{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
         int len = (int) (Math.random() * 10);
 
         StringBuilder stringBuilder = new StringBuilder();
-        for (int i = 0; i< 15 + len; i++){
+        for (int i = 0; i< 5 + len; i++){
             stringBuilder.append(strings[(int) (Math.random()* strings.length)]);
         }
 

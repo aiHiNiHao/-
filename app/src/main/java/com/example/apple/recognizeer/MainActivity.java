@@ -28,24 +28,27 @@ import android.webkit.CookieManager;
 import android.view.WindowManager;
 import android.webkit.WebView;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.text.TextBlock;
 import com.google.android.gms.vision.text.TextRecognizer;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends BaseActivity {
 
     public String YAN = Utils.getRandomString();//用于识别输入框的关键字
     public String YAN_UNSAFE = Utils.getRandomString();
     public static final String KW = "活性炭";
-    public static final String GOAL = "www.lyll.com.cn";
+    public static final String GOAL = "www.21hxt.com";
     public static final String GOAL1 = "www.lyl.com.cn";
     public static final String GOAL2 = "www.yll.com.cn";
 
     private WebView webView;
-    private ImageView ivShow;
+    private TextView tvShow;
 
     private MediaProjectionManager mMediaProjectionManager;
     private TextRecognizer textRecognizer;
@@ -62,10 +65,11 @@ public class MainActivity extends BaseActivity {
     private final int MSG_INIT = 1;//初始状态
     private final int MSG_FIRST_GET_INPUT_BOUND = 2;//第一次获取输入框位置前的状态
     private final int MSG_SECOND_GET_INPUT_BOUND = 3;//第二次获取输入框位置前的状态
-    private final int MSG_SS = 4;//短暂性的， 点击百度一下按钮后的状态
-    private final int MSG_SS_FINISHED = 5;// 搜索出结果后的状态
-    private final int MSG_FINDING_SCROLL = 6;// 监测到当前内容中包含了识别目标，需要滑动来定位item的位置
-    private final int MSG_FINDED = 7;// 定位完成，将要执行下一次循环
+    private final int MSG_SOUSUO = 4;//短暂性的， 点击百度一下按钮后的状态
+    private final int MSG_SOUSUO_FINISHED = 5;// 搜索出结果后的状态
+    private final int MSG_SOUSUO_FINISHED_NEXTPAGE = 6;// webview点击下一页继续查找
+    private final int MSG_FINDING_SCROLL = 7;// 监测到当前内容中包含了识别目标，需要滑动来定位item的位置
+    private final int MSG_FINDED = 8;// 定位完成，将要执行下一次循环
 
     private int currState = MSG_INIT;
 
@@ -73,7 +77,9 @@ public class MainActivity extends BaseActivity {
 
     private Rect finalInputRect;// 第二次获取的输入框的位置，
 
-    private TestNecrosis testNecrosisThread;
+    private TestNecrosisRunnable testNecrosisRunnable;
+
+    public ExecutorService executorService = Executors.newFixedThreadPool(2);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,15 +93,15 @@ public class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        testNecrosisThread = new TestNecrosis();
-        testNecrosisThread.start();
+        testNecrosisRunnable = new TestNecrosisRunnable();
+        executorService.execute(testNecrosisRunnable);
 
         initHandler();
 
         webView = findViewById(R.id.webview);
-        ivShow = findViewById(R.id.iv_show);
+        tvShow = findViewById(R.id.iv_show);
 
-        webJumpController = new WebJumpController(this, webView, new WebJumpController.WebJumpListener() {
+        webJumpController = new WebJumpController(this, webView, tvShow,new WebJumpController.WebJumpListener() {
             @Override
             public void onFindedUnsafeElement() {
                 handler.postDelayed(new Runnable() {
@@ -109,6 +115,7 @@ public class MainActivity extends BaseActivity {
             @Override
             public void onFindedTargetPage() {
                 restartRecongnizer(MSG_FINDING_SCROLL);
+                Log.i("lijing", "------------------onFindedTargetPage");
             }
 
             @Override
@@ -116,10 +123,10 @@ public class MainActivity extends BaseActivity {
 
                 if (currState == MSG_INIT) {//加载完成了关键字，将要识别输入框的位置
                     handler.sendEmptyMessageDelayed(MSG_INIT, 500);
-                } else if (currState == MSG_SS) {//搜索完成，开始检测目标网站
-                    currState = MSG_SS_FINISHED;
+                } else if (currState == MSG_SOUSUO) {//搜索完成，开始检测目标网站
+                    currState = MSG_SOUSUO_FINISHED;
                     Message msg = Message.obtain();
-                    msg.what = MSG_SS_FINISHED;
+                    msg.what = MSG_SOUSUO_FINISHED;
                     Bundle bundle = new Bundle();
                     bundle.putString("url", url);
                     msg.setData(bundle);
@@ -128,9 +135,9 @@ public class MainActivity extends BaseActivity {
                     handler.sendEmptyMessageDelayed(MSG_FINDED, 2000);
                 }
 
-                if (testNecrosisThread!=null){
+                if (testNecrosisRunnable != null) {
                     //每次webview页面刷新就将时间标识置为当前时间
-                    testNecrosisThread.makeZero();
+                    testNecrosisRunnable.makeZero();
                 }
 
             }
@@ -171,7 +178,6 @@ public class MainActivity extends BaseActivity {
         imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {
-                Log.i("lijing", "onImageAvailable: -----------");
 
                 Image image = imageReader.acquireLatestImage();
 
@@ -205,10 +211,9 @@ public class MainActivity extends BaseActivity {
 
                             if (YAN.equals(value) || value.contains(YAN)) {//这个就是输入框中的文字，所对应的位置就是输入框的位置
                                 inputRect = item.getBoundingBox();
-                                Log.i("lijing", inputRect.toString());
 
                                 if (currState == MSG_FIRST_GET_INPUT_BOUND) {
-                                    if (inputRect.centerY()> height/2){//有事可能有两个输入框，底部的输入框不算数
+                                    if (inputRect.centerY() > height / 2) {//有事可能有两个输入框，底部的输入框不算数
                                         continue;
                                     }
 
@@ -245,7 +250,7 @@ public class MainActivity extends BaseActivity {
                     }
 
                     if (currState == MSG_SECOND_GET_INPUT_BOUND || currState == MSG_FIRST_GET_INPUT_BOUND) {
-                        if (inputRect == null){//如果当前没有输入框，无法执行下一步操作，直接开始下一轮
+                        if (inputRect == null) {//如果当前没有输入框，无法执行下一步操作，直接开始下一轮
                             restart();
                         }
                     } else if (currState == MSG_FINDING_SCROLL) {
@@ -293,6 +298,7 @@ public class MainActivity extends BaseActivity {
 
     /**
      * 模拟点击事件
+     *
      * @param x
      * @param y
      */
@@ -328,7 +334,7 @@ public class MainActivity extends BaseActivity {
 
         final long finalUptimeMillis = uptimeMillis;
         final int finalDownY = downY;
-        new Thread(new Runnable() {
+        executorService.execute(new Runnable() {
             @Override
             public void run() {
                 SystemClock.sleep(100);
@@ -342,7 +348,7 @@ public class MainActivity extends BaseActivity {
                 SystemClock.sleep(100);
                 restartRecongnizer(MSG_FINDING_SCROLL);
             }
-        }).start();
+        });
 
     }
 
@@ -355,12 +361,13 @@ public class MainActivity extends BaseActivity {
                     case MSG_INIT:
                         //页面初次加载完成，开始寻找输入框
                         restartRecongnizer(MSG_FIRST_GET_INPUT_BOUND);
+                        Log.i("lijing", "------------------start");
                         break;
                     case MSG_FIRST_GET_INPUT_BOUND:
                         //第一次找到输入框
                         Bundle data = msg.getData();
                         Rect rect = data.getParcelable("rect");
-
+                        Log.i("lijing", "------------------第一次找到输入框");
                         autoClick(rect.centerX(), rect.centerY());
 
                         postDelayed(new Runnable() {
@@ -373,19 +380,21 @@ public class MainActivity extends BaseActivity {
 
                         break;
                     case MSG_SECOND_GET_INPUT_BOUND:
-
+                        Log.i("lijing", "------------------第二次找到输入框-----");
                         //第二次寻找到输入框，键入最终关键字
                         autoInputKeyword();
 
                         break;
 
-                    case MSG_SS:
+                    case MSG_SOUSUO:
                         //输入关键字完成，百度一下
+                        Log.i("lijing", "------------------输入关键字完成");
                         autoClickSouSuo();
                         break;
 
-                    case MSG_SS_FINISHED:
+                    case MSG_SOUSUO_FINISHED:
                         // 搜索完成，开始寻找目标网站
+                        Log.i("lijing", "------------------搜索完成");
                         Bundle urlBundle = msg.getData();
                         String url = urlBundle.getString("url");
                         webJumpController.requestJsoupData(url);
@@ -407,6 +416,7 @@ public class MainActivity extends BaseActivity {
                         break;
 
                     case MSG_FINDED:
+
                         restart();
                         break;
                 }
@@ -423,16 +433,14 @@ public class MainActivity extends BaseActivity {
     /**
      * 清空回收
      */
-    public void nip(){
+    public void nip() {
         if (mVirtualDisplay != null) {
             mVirtualDisplay.release();
         }
         handler.removeCallbacksAndMessages(null);
         RecognizerApp.getInstance().deleteCookie();
-        if (testNecrosisThread != null) {
-            testNecrosisThread.finish();
-            testNecrosisThread.interrupt();
-            testNecrosisThread = null;
+        if (testNecrosisRunnable != null) {
+            testNecrosisRunnable.finish();
         }
 
         finish();
@@ -444,7 +452,7 @@ public class MainActivity extends BaseActivity {
         final String strJS = String.format("javascript:document.getElementById('kw').value='%s';", KW);
 
         webView.evaluateJavascript(strJS, null);
-        handler.sendEmptyMessageDelayed(MSG_SS, 500);
+        handler.sendEmptyMessageDelayed(MSG_SOUSUO, 500);
 
     }
 
@@ -462,16 +470,16 @@ public class MainActivity extends BaseActivity {
             int[] display = Utils.getDisplay(this);
 
             autoClick(display[0] * 9 / 10, finalInputRect.centerY());
-            currState = MSG_SS;
+            currState = MSG_SOUSUO;
         }
     }
 
 
-    class TestNecrosis extends Thread {
+    class TestNecrosisRunnable implements Runnable {
         private long time_test_necrosis;
         private boolean execute = true;
 
-        public TestNecrosis() {
+        public TestNecrosisRunnable() {
             makeZero();
         }
 
@@ -486,10 +494,10 @@ public class MainActivity extends BaseActivity {
         @Override
         public void run() {
             while (execute) {
-                Log.e("lijing", "code == "+ MainActivity.this.hashCode());
                 long systemTime = System.currentTimeMillis();
                 if (systemTime - time_test_necrosis > 10000) {//当webview10秒没反应就强制退出
 
+                    Log.e("lijing", "------------" + MainActivity.this.hashCode());
                     handler.sendEmptyMessage(MSG_FINDED);
                     return;
                 }
