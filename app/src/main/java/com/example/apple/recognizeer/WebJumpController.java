@@ -144,7 +144,7 @@ public class WebJumpController {
     private void loadNextPageUrl(String url) {
         Log.i("lijingweb url", url);
 
-        if (page > 5){
+        if (page > 0){
             if (listener != null) {
                 listener.onPageCountOutOfBound();
             }

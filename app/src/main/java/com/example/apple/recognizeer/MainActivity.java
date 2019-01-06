@@ -4,8 +4,11 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.Image;
@@ -24,9 +27,12 @@ import android.util.SparseArray;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.view.WindowManager;
 import android.webkit.WebView;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -76,6 +82,7 @@ public class MainActivity extends BaseActivity {
     private Handler handler;
 
     private Rect finalInputRect;// 第二次获取的输入框的位置，
+    private View inputRectView, clickPointView;
 
     private TestNecrosisRunnable testNecrosisRunnable;
 
@@ -91,6 +98,22 @@ public class MainActivity extends BaseActivity {
 
 
         setContentView(R.layout.activity_main);
+        inputRectView = new View(this);
+        clickPointView = new View(this);
+        inputRectView.setBackgroundResource(R.drawable.shape);
+        clickPointView.setBackgroundResource(R.drawable.shape_click);
+        ((ViewGroup) (getWindow().getDecorView())).addView(inputRectView);
+        ((ViewGroup) (getWindow().getDecorView())).addView(clickPointView);
+
+        ViewGroup.LayoutParams layoutParams = inputRectView.getLayoutParams();
+        layoutParams.width = 0;
+        layoutParams.height = 0;
+        inputRectView.setLayoutParams(layoutParams);
+        ViewGroup.LayoutParams layoutParams1 = clickPointView.getLayoutParams();
+        layoutParams1.width = 0;
+        layoutParams1.height = 0;
+        clickPointView.setLayoutParams(layoutParams1);
+
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         testNecrosisRunnable = new TestNecrosisRunnable();
@@ -101,7 +124,7 @@ public class MainActivity extends BaseActivity {
         webView = findViewById(R.id.webview);
         tvShow = findViewById(R.id.iv_show);
 
-        webJumpController = new WebJumpController(this, webView, tvShow,new WebJumpController.WebJumpListener() {
+        webJumpController = new WebJumpController(this, webView, tvShow, new WebJumpController.WebJumpListener() {
             @Override
             public void onFindedUnsafeElement() {
                 handler.postDelayed(new Runnable() {
@@ -132,7 +155,12 @@ public class MainActivity extends BaseActivity {
                     msg.setData(bundle);
                     handler.sendMessage(msg);
                 } else if (currState == MSG_FINDED) {//完成本次操作
-                    handler.sendEmptyMessageDelayed(MSG_FINDED, 2000);
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            restart();
+                        }
+                    }, 2000);
                 }
 
                 if (testNecrosisRunnable != null) {
@@ -216,7 +244,7 @@ public class MainActivity extends BaseActivity {
 
                             if (YAN.equals(value) || value.contains(YAN)) {//这个就是输入框中的文字，所对应的位置就是输入框的位置
                                 inputRect = item.getBoundingBox();
-
+                                showInputRect(inputRect);
                                 if (currState == MSG_FIRST_GET_INPUT_BOUND) {
                                     if (inputRect.centerY() > height / 2) {//有事可能有两个输入框，底部的输入框不算数
                                         continue;
@@ -315,7 +343,7 @@ public class MainActivity extends BaseActivity {
 
         MotionEvent motionEvent_up = MotionEvent.obtain(downTime, uptimeMillis, MotionEvent.ACTION_UP, x, y, 0);
         dispatchTouchEvent(motionEvent_up);
-
+        showClickPointRect(new Point(x, y));
     }
 
     /**
@@ -457,7 +485,7 @@ public class MainActivity extends BaseActivity {
         final String strJS = String.format("javascript:document.getElementById('kw').value='%s';", KW);
 
         webView.evaluateJavascript(strJS, null);
-        handler.sendEmptyMessageDelayed(MSG_SOUSUO, 500);
+        handler.sendEmptyMessageDelayed(MSG_SOUSUO, 1500);
 
     }
 
@@ -479,6 +507,27 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    private void showInputRect(Rect inputRect) {
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) inputRectView.getLayoutParams();
+        layoutParams.width = inputRect.width();
+        layoutParams.height = inputRect.height();
+        layoutParams.topMargin = inputRect.top;
+        layoutParams.leftMargin = inputRect.left;
+        inputRectView.setLayoutParams(layoutParams);
+
+
+    }
+
+    private void showClickPointRect(Point clickPoint) {
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) clickPointView.getLayoutParams();
+        layoutParams.width = 20;
+        layoutParams.height = 20;
+        layoutParams.topMargin = clickPoint.y;
+        layoutParams.leftMargin = clickPoint.x;
+        clickPointView.setLayoutParams(layoutParams);
+
+
+    }
 
     class TestNecrosisRunnable implements Runnable {
         private long time_test_necrosis;
@@ -503,7 +552,12 @@ public class MainActivity extends BaseActivity {
                 Log.e("lijing", "------------" + MainActivity.this.hashCode());
                 if (systemTime - time_test_necrosis > 20000) {//当webview10秒没反应就强制退出
 
-                    handler.sendEmptyMessage(MSG_FINDED);
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            restart();
+                        }
+                    });
                     return;
                 }
                 SystemClock.sleep(300);
